@@ -1,0 +1,65 @@
+{
+    "_doc": "Example config for USERINFOISSALARY -- use this to validate the tool output against the live procedures.",
+
+    "table_name":          "USERINFOISSALARY",
+    "table_uuid":          "ab18c18c-ccff-62b6-4975-156ffc566ef8",
+    "is_multi_tenant":     true,
+    "wave":                2,
+    "wave2_parent":        "USERINFO",
+    "load_order":          20,
+    "is_active_full_load": true,
+    "is_active_delta_load":true,
+    "description":         "Employee salary flag history per client",
+    "warehouse":           "WH_DS_AUTOMATION_TST",
+
+    "columns": [
+        {
+            "name":    "DATABASEPHYSICALNAME",
+            "sf_type": "VARCHAR(16777216)",
+            "pk":      true,
+            "not_null":true
+        },
+        {
+            "name":    "USERINFOISSALARYID",
+            "sf_type": "NUMBER(38,0)",
+            "pk":      true,
+            "not_null":true
+        },
+        {
+            "name":    "USERID",
+            "sf_type": "NUMBER(38,0)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "ISSALARY",
+            "sf_type": "BOOLEAN",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "STARTDATETIME",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "ENDDATETIME",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "MODIFIEDBY",
+            "sf_type": "NUMBER(38,0)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "MODIFIEDON",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":true
+        }
+    ]
+}

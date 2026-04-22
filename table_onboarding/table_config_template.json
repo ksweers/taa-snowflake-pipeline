@@ -1,0 +1,100 @@
+{
+    "_doc": {
+        "purpose": "Configuration template for the TAA table onboarding tool.",
+        "usage":   "python table_onboarding_tool.py this_file.json",
+        "fields": {
+            "table_name":          "Snowflake target table name (uppercased automatically).",
+            "table_uuid":          "UUID from the OneLake file path: .../Tables/<UUID>/TableData_*/",
+            "is_multi_tenant":     "true if DATABASEPHYSICALNAME is derived from the file path (most tables). false for CUSTOMER, ENTERPRISECUSTOMER (DATABASEPHYSICALNAME is a real payload column).",
+            "wave":                "1 = no FK dependency on another table; 2 = must wait for a Wave 1 table.",
+            "wave2_parent":        "Required when wave=2. The Wave 1 table this table depends on (e.g. 'USERINFO').",
+            "load_order":          "Numeric sort order in INGEST_TAA_TABLE_CONFIG. Lower numbers run first in sequential contexts. Suggest: 10=wave1, 20=wave2.",
+            "is_active_full_load": "Set to false to exclude from full load runs without deleting the config row.",
+            "is_active_delta_load":"Set to false to exclude from delta load runs.",
+            "description":         "Human-readable description stored in INGEST_TAA_TABLE_CONFIG.",
+            "warehouse":           "Optional override. Defaults to WH_DS_AUTOMATION_TST.",
+            "columns": {
+                "_doc":        "Ordered list of columns in the Snowflake target table.",
+                "name":        "Column name exactly as it appears in Snowflake DDL.",
+                "sf_type":     "Snowflake data type (e.g. NUMBER(38,0), VARCHAR(16777216), BOOLEAN, TIMESTAMP_NTZ(9)).",
+                "pk":          "true if this column is part of the primary key.",
+                "not_null":    "true to add NOT NULL constraint (default true). Set false for nullable columns.",
+                "is_tenant_key": "Informational only -- marks DATABASEPHYSICALNAME. The tool uses is_multi_tenant to decide how to handle it."
+            },
+            "_csv_positions": [
+                "CSV delta files have 4 metadata columns before data columns:",
+                "  $1 = hex LSN  $2 = meta  $3 = CHANGE_TYPE  $4 = meta",
+                "  $5+ = actual table columns (in source schema order)",
+                "For multi-tenant tables DATABASEPHYSICALNAME is NOT a CSV column --",
+                "it is derived from METADATA$FILENAME by the tool automatically.",
+                "For non-multi-tenant tables (is_multi_tenant=false) all columns",
+                "including DATABASEPHYSICALNAME are positional starting at $5."
+            ]
+        }
+    },
+
+    "table_name":          "NEWTABLE",
+    "table_uuid":          "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "is_multi_tenant":     true,
+    "wave":                1,
+    "wave2_parent":        null,
+    "load_order":          10,
+    "is_active_full_load": true,
+    "is_active_delta_load":true,
+    "description":         "Description of what this table contains.",
+    "warehouse":           "WH_DS_AUTOMATION_TST",
+
+    "columns": [
+        {
+            "name":    "DATABASEPHYSICALNAME",
+            "sf_type": "VARCHAR(16777216)",
+            "pk":      true,
+            "not_null":true,
+            "is_tenant_key": true,
+            "_note":   "For multi-tenant tables this is always first. Derived from file path in both Parquet and CSV loads."
+        },
+        {
+            "name":    "SOMEID",
+            "sf_type": "NUMBER(38,0)",
+            "pk":      true,
+            "not_null":true
+        },
+        {
+            "name":    "SOMECOLUMN",
+            "sf_type": "VARCHAR(100)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "SOMEFLAG",
+            "sf_type": "BOOLEAN",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "STARTDATETIME",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "ENDDATETIME",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":false,
+            "_note":   "Nullable example -- not_null set to false"
+        },
+        {
+            "name":    "MODIFIEDBY",
+            "sf_type": "NUMBER(38,0)",
+            "pk":      false,
+            "not_null":true
+        },
+        {
+            "name":    "MODIFIEDON",
+            "sf_type": "TIMESTAMP_NTZ(9)",
+            "pk":      false,
+            "not_null":true
+        }
+    ]
+}
