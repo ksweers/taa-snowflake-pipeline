@@ -1,6 +1,6 @@
 # taa-snowflake-pipeline
 
-CI/CD repository for the **TAA → Snowflake** ingestion pipeline. This repo manages all Snowflake object definitions (tables, procedures, task DAGs) for both the **full Parquet load** and **delta CSV load** pipelines, along with the tooling to split, deploy, and onboard new tables.
+CI/CD repository for the **TAA → Snowflake** ingestion pipeline. This repo manages all Snowflake object definitions (tables, procedures, task DAGs) for both the **full Parquet load** and **delta CSV load** pipelines, along with the tooling to deploy and onboard new tables.
 
 ---
 
@@ -24,7 +24,6 @@ taa-snowflake-pipeline/
 │       └── tasks/              # task_dag.sql — delta DAG definition + RESUME
 │
 ├── scripts/
-│   ├── split_monolith.py       # Splits monolithic SQL files → individual object files
 │   └── deploy.py               # Change-aware Snowflake deployment engine
 │
 ├── table_onboarding/
@@ -77,18 +76,7 @@ Key variables:
 | `SNOWFLAKE_WAREHOUSE` | Compute warehouse |
 | `SNOWFLAKE_ROLE` | Deployment role |
 
-### 3. Split the monolithic SQL files (first-time setup)
-
-If `pipeline/` is empty, generate the individual object files from the source monoliths:
-
-```bash
-python scripts/split_monolith.py \
-  --full-load  /path/to/onelake_taa_full_parquet_ingest.sql \
-  --delta-load /path/to/onelake_taa_delta_csv_ingest.sql \
-  --output-dir pipeline/
-```
-
-### 4. Deploy to Snowflake
+### 3. Deploy to Snowflake
 
 ```bash
 # Deploy only files changed vs the previous commit (normal workflow)
