@@ -28,7 +28,7 @@ AS '
 -- =============================================================================
 -- PROCEDURE: INGEST_TAA_DELTA_PREPARE
 -- =============================================================================
--- No-argument payload for TAA_DL_ROOT.
+-- No-argument payload for TAA_DELTA_ROOT.
 -- Reads run parameters from INGEST_TAA_DELTA_RUN_CONFIG then calls
 -- BUILD_STAGE_TAA_DELTA_MANIFEST to populate STAGE_TAA_DELTA_MANIFEST.
 -- Wave 1 tasks start immediately after this succeeds.

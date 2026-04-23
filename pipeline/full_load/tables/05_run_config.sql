@@ -24,7 +24,7 @@ VALUES (src.PARAM_NAME, src.PARAM_VALUE);
 -- =============================================================================
 -- PROCEDURE: INGEST_TAA_FULL_LOAD_PREPARE
 -- =============================================================================
--- No-argument payload for TAA_FL_ROOT.
+-- No-argument payload for TAA_FULL_ROOT.
 -- Reads run parameters from INGEST_TAA_RUN_CONFIG then:
 --   1. Clears target tables (multi-tenant: DELETE per client; others: TRUNCATE).
 --   2. Calls BUILD_STAGE_TAA_FULL_FILE_MANIFEST.

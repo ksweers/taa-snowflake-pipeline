@@ -48,17 +48,17 @@ AS '
             "  tgt.UPDATED_AT  = CURRENT_TIMESTAMP();"
         }).execute();
 
-        snowflake.createStatement({sqlText: "EXECUTE TASK TAA_DL_ROOT;"}).execute();
+        snowflake.createStatement({sqlText: "EXECUTE TASK TAA_DELTA_ROOT;"}).execute();
 
         var scope = client_val ? " (client: " + client_val + ")" : " (all clients)";
         return "Delta Task DAG triggered" + scope + ".\\n" +
                "Stage: " + stage_name_safe + "\\n" +
                "STAGE_NAME persists in INGEST_TAA_DELTA_RUN_CONFIG for future scheduled runs.\\n" +
                "\\nMonitor progress:\\n" +
-               "  SELECT * FROM TABLE(TASK_DEPENDENTS(''TAA_DL_ROOT'', TRUE)) ORDER BY SCHEDULED_TIME;\\n" +
+               "  SELECT * FROM TABLE(TASK_DEPENDENTS(''TAA_DELTA_ROOT'', TRUE)) ORDER BY SCHEDULED_TIME;\\n" +
                "\\nView history:\\n" +
                "  SELECT NAME, STATE, ERROR_MESSAGE, SCHEDULED_TIME, COMPLETED_TIME\\n" +
-               "  FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(TASK_NAME => ''TAA_DL_ROOT'', RESULT_LIMIT => 10))\\n" +
+               "  FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(TASK_NAME => ''TAA_DELTA_ROOT'', RESULT_LIMIT => 10))\\n" +
                "  ORDER BY SCHEDULED_TIME DESC;";
     } catch (err) {
         throw new Error("INGEST_TAA_LAUNCH_DELTA_LOAD failed: " + err.message);
@@ -72,9 +72,9 @@ AS '
 -- Deployment notes:
 --   - All tasks are created SUSPENDED by default.
 --   - Run the ENABLE section at the bottom of this file after deployment.
---   - To modify the DAG: ALTER TASK TAA_DL_ROOT SUSPEND first.
+--   - To modify the DAG: ALTER TASK TAA_DELTA_ROOT SUSPEND first.
 --   - All tasks execute on warehouse WH_DS_AUTOMATION_TST.
---   - TAA_DL_ROOT fires nightly at 02:00 UTC. Adjust CRON expression as needed.
+--   - TAA_DELTA_ROOT fires nightly at 02:00 UTC. Adjust CRON expression as needed.
 --   - For on-demand runs: CALL INGEST_TAA_LAUNCH_DELTA_LOAD(...)
 --   - First-time setup: call INGEST_TAA_LAUNCH_DELTA_LOAD with STAGE_NAME to
 --     persist the stage; subsequent scheduled runs use the stored value.

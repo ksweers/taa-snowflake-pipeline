@@ -76,7 +76,7 @@ AS '
                     FROM @` + STAGE_NAME + ` (FILE_FORMAT => ''FF_TAA_ONELAKE_CSV'')
                 )
                 FILES = (` + files_clause + `)
-                ON_ERROR = ABORT_STATEMENT FORCE = TRUE
+                ON_ERROR = CONTINUE FORCE = TRUE
             `;
             var copy_result = snowflake.createStatement({sqlText: copy_sql}).execute();
 
@@ -163,7 +163,7 @@ AS '
 -- All DELTA_LOAD_* procedures defined above are called by DELTA_LOAD_FROM_CONFIG.
 --
 -- Task DAG structure (mirrors full load wave pattern):
---   TAA_DL_ROOT (nightly CRON 02:00 UTC; also triggered via INGEST_TAA_LAUNCH_DELTA_LOAD)
+--   TAA_DELTA_ROOT (nightly CRON 02:00 UTC; also triggered via INGEST_TAA_LAUNCH_DELTA_LOAD)
 --     -> Wave 1 (8 parallel): CUSTOMER, ENTERPRISECUSTOMER, PAYTYPE, SCHEDULE,
 --                             USERINFO, TIMEOFFDATA, TIMEOFFREQUEST, TIMESLICEPOST
 --     -> Wave 2 (4 serial, each after its FK parent):
@@ -171,7 +171,7 @@ AS '
 --          TIMEOFFREQUEST -> TIMEOFFREQUESTDETAIL
 --          TIMESLICEPOST -> TIMESLICEPOSTEXCEPTIONDETAIL
 --          TIMESLICEPOST -> TIMESLICEPOSTSHIFTDIFFDETAIL
---     -> TAA_DL_FINALIZE (after all 9 leaf tasks)
+--     -> TAA_DELTA_FINALIZE (after all 9 leaf tasks)
 -- =============================================================================
 
 
