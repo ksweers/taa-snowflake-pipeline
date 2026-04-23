@@ -41,17 +41,17 @@ AS '
 
         // Resume the root (it suspends itself at the end of each run via INGEST_TAA_FULL_LOAD_FINALIZE).
         // RESUME is idempotent -- safe to call even if already resumed.
-        snowflake.createStatement({sqlText: "ALTER TASK TAA_FL_ROOT RESUME;"}).execute();
-        snowflake.createStatement({sqlText: "EXECUTE TASK TAA_FL_ROOT;"}).execute();
+        snowflake.createStatement({sqlText: "ALTER TASK TAA_FULL_ROOT RESUME;"}).execute();
+        snowflake.createStatement({sqlText: "EXECUTE TASK TAA_FULL_ROOT;"}).execute();
 
         var scope = client_val ? " (client: " + client_val + ")" : " (all clients)";
         return "Task DAG triggered" + scope + ".\\n" +
                "Stage: " + stage_name_safe + "\\n" +
                "\\nMonitor progress:\\n" +
-               "  SELECT * FROM TABLE(TASK_DEPENDENTS(''TAA_FL_ROOT'', TRUE)) ORDER BY SCHEDULED_TIME;\\n" +
+               "  SELECT * FROM TABLE(TASK_DEPENDENTS(''TAA_FULL_ROOT'', TRUE)) ORDER BY SCHEDULED_TIME;\\n" +
                "\\nView history:\\n" +
                "  SELECT NAME, STATE, ERROR_MESSAGE, SCHEDULED_TIME, COMPLETED_TIME\\n" +
-               "  FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(TASK_NAME => ''TAA_FL_ROOT'', RESULT_LIMIT => 10))\\n" +
+               "  FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(TASK_NAME => ''TAA_FULL_ROOT'', RESULT_LIMIT => 10))\\n" +
                "  ORDER BY SCHEDULED_TIME DESC;";
     } catch (err) {
         throw new Error("INGEST_TAA_LAUNCH_FULL_LOAD failed: " + err.message);

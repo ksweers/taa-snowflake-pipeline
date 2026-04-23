@@ -109,7 +109,7 @@ AS '
                     (FILE_FORMAT => ''FF_TAA_ONELAKE_CSV'')
                 )
                 FILES = (` + files_clause + `)
-                ON_ERROR = ABORT_STATEMENT
+                ON_ERROR = CONTINUE
                 FORCE = TRUE
             `;
             var copy_result = snowflake.createStatement({sqlText: copy_sql}).execute();

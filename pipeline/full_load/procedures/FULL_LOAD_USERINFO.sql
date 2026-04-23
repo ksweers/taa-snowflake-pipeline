@@ -150,7 +150,7 @@ AS '
 -- All FULL_LOAD_* procedures defined above are called directly by the Tasks.
 --
 -- Task DAG structure:
---   TAA_FL_ROOT (trigger via INGEST_TAA_LAUNCH_FULL_LOAD)
+--   TAA_FULL_ROOT (trigger via INGEST_TAA_LAUNCH_FULL_LOAD)
 --     -> Wave 1 (8 parallel): CUSTOMER, ENTERPRISECUSTOMER, PAYTYPE, SCHEDULE,
 --                             USERINFO, TIMEOFFDATA, TIMEOFFREQUEST, TIMESLICEPOST
 --     -> Wave 2 (4 serial, each after its FK parent):
@@ -158,7 +158,7 @@ AS '
 --          TIMEOFFREQUEST -> TIMEOFFREQUESTDETAIL
 --          TIMESLICEPOST -> TIMESLICEPOSTEXCEPTIONDETAIL
 --          TIMESLICEPOST -> TIMESLICEPOSTSHIFTDIFFDETAIL
---     -> TAA_FL_FINALIZE (after all 9 leaf tasks)
+--     -> TAA_FULL_FINALIZE (after all 9 leaf tasks)
 -- =============================================================================
 
 

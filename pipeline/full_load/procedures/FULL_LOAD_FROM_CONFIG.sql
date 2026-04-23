@@ -30,9 +30,9 @@ AS '
 -- Deployment notes:
 --   - All tasks are created SUSPENDED by default.
 --   - Run the ENABLE section at the bottom of this file after deployment.
---   - To modify the DAG: ALTER TASK TAA_FL_ROOT SUSPEND first.
+--   - To modify the DAG: ALTER TASK TAA_FULL_ROOT SUSPEND first.
 --   - All tasks execute on warehouse WH_DS_AUTOMATION_TST.
---   - TAA_FL_ROOT has SCHEDULE = '11520 MINUTE' (8 days). Snowflake requires
+--   - TAA_FULL_ROOT has SCHEDULE = '11520 MINUTE' (8 days). Snowflake requires
 --     a SCHEDULE on root tasks before they can be RESUMED. The schedule is
 --     intentionally long -- the task should only ever run via EXECUTE TASK
 --     triggered by INGEST_TAA_LAUNCH_FULL_LOAD.
