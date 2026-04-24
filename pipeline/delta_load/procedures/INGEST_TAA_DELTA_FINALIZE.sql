@@ -52,8 +52,9 @@ AS '
         }
 
         // ------------------------------------------------------------------
-        // Per-table delta summary from INGEST_TAA_FILE_AUDIT (last 12 hours,
-        // delta files only).  Join to TABLE_CONFIG for ordered table names.
+        // Per-table delta summary from INGEST_TAA_FILE_AUDIT.
+        // Anchored to STAGE_TAA_DELTA_MANIFEST (this run''s files) so that
+        // prior-run audit rows never bleed into the report.
         // ------------------------------------------------------------------
         var tbl_result = snowflake.createStatement({sqlText: `
             SELECT
@@ -65,8 +66,12 @@ AS '
             FROM INGEST_TAA_TABLE_CONFIG cfg
             LEFT JOIN INGEST_TAA_FILE_AUDIT aud
                 ON  UPPER(aud.TABLE_ID) = UPPER(cfg.SOURCE_TABLE_ID)
-                AND aud.FILE_LOAD_TIMESTAMP >= DATEADD(hour, -12, CURRENT_TIMESTAMP())
-                AND aud.FULL_STAGE_PATH ILIKE ''%ChangeData%''
+                -- Anchor to files that were in THIS run''s manifest, not a time window.
+                AND EXISTS (
+                    SELECT 1
+                    FROM STAGE_TAA_DELTA_MANIFEST mfst
+                    WHERE mfst.FULL_FILE_PATH = aud.FULL_STAGE_PATH
+                )
             WHERE cfg.IS_ACTIVE_DELTA_LOAD = TRUE
             GROUP BY cfg.TABLE_NAME, cfg.LOAD_ORDER
             ORDER BY cfg.LOAD_ORDER, cfg.TABLE_NAME

@@ -61,8 +61,14 @@ AS '
             LEFT JOIN INGEST_TAA_FILE_AUDIT aud
                 ON  UPPER(aud.TABLE_ID) = UPPER(cfg.SOURCE_TABLE_ID)
                 AND aud.LOAD_STATUS IN (''SUCCESS'', ''FAILED'')
-                AND aud.FILE_LOAD_TIMESTAMP >= DATEADD(hour, -12, CURRENT_TIMESTAMP())
-                AND aud.FULL_STAGE_PATH NOT ILIKE ''%ChangeData%''
+                -- Anchor to files that were in THIS run''s manifest, not a time window.
+                -- This prevents prior-run audit rows from appearing when the manifest
+                -- is empty (e.g. all files already loaded and skipped by audit dedup).
+                AND EXISTS (
+                    SELECT 1
+                    FROM STAGE_TAA_FULL_FILE_MANIFEST mfst
+                    WHERE mfst.FULL_FILE_PATH = aud.FULL_STAGE_PATH
+                )
             WHERE cfg.IS_ACTIVE_FULL_LOAD = TRUE
             GROUP BY cfg.TABLE_NAME, cfg.LOAD_ORDER
             ORDER BY cfg.LOAD_ORDER, cfg.TABLE_NAME
