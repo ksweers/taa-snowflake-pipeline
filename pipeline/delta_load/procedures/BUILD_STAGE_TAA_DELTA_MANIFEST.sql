@@ -109,14 +109,14 @@ AS '
             INNER JOIN INGEST_TAA_FULL_LOAD_STATE state
                 ON  state.client_id        = parsed.client_id
                 AND state.table_id         = parsed.table_id
-            -- Must be in the same TableData_* folder as the last full load
-            WHERE parsed.tabledata_folder  = state.tabledata_folder
-            -- Must be newer than the full load file (not before or equal to it)
-              AND parsed.last_modified     > state.full_load_last_modified
             -- Only include tables that are configured and active for delta load
             INNER JOIN INGEST_TAA_TABLE_CONFIG cfg
                 ON  UPPER(cfg.SOURCE_TABLE_ID) = UPPER(parsed.table_id)
                 AND cfg.IS_ACTIVE_DELTA_LOAD   = TRUE
+            -- Must be in the same TableData_* folder as the last full load
+            WHERE parsed.tabledata_folder  = state.tabledata_folder
+            -- Must be newer than the full load file (not before or equal to it)
+              AND parsed.last_modified     > state.full_load_last_modified
             -- Must not already have been applied
               AND NOT EXISTS (
                     SELECT 1
