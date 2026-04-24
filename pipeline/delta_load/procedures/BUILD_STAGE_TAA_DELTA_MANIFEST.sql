@@ -2,8 +2,9 @@ USE DATABASE &{{SNOWFLAKE_DATABASE}};
 USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
 CREATE OR REPLACE PROCEDURE BUILD_STAGE_TAA_DELTA_MANIFEST(
-    CLIENT_ID_FILTER VARCHAR,
-    STAGE_NAME       VARCHAR
+    CLIENT_ID_FILTER    VARCHAR,
+    TABLE_NAME_FILTER   VARCHAR,
+    STAGE_NAME          VARCHAR
 )
 RETURNS VARCHAR
 LANGUAGE JAVASCRIPT
@@ -32,6 +33,31 @@ AS '
             client_id_in_list = quoted_ids.join(", ");
         }
 
+        // Parse comma-separated table names into a subquery against INGEST_TAA_TABLE_CONFIG.
+        // The manifest stores table_id (UUID); we resolve names → UUIDs via the config table.
+        var is_table_scoped = (
+            TABLE_NAME_FILTER !== null &&
+            TABLE_NAME_FILTER !== undefined &&
+            TABLE_NAME_FILTER.trim() !== ""
+        );
+        var table_where_clause = "";
+        var table_filter_display = null;
+        if (is_table_scoped) {
+            var tbl_names = TABLE_NAME_FILTER.trim().split(",");
+            var quoted_tables = [];
+            table_filter_display = "";
+            for (var ti = 0; ti < tbl_names.length; ti++) {
+                var tn = tbl_names[ti].trim().toUpperCase();
+                if (tn.length > 0) {
+                    quoted_tables.push("''" + tn + "''");
+                    table_filter_display += (table_filter_display.length > 0 ? ", " : "") + tn;
+                }
+            }
+            table_where_clause = "AND parsed.table_id IN (" +
+                "SELECT SOURCE_TABLE_ID FROM INGEST_TAA_TABLE_CONFIG " +
+                "WHERE UPPER(TABLE_NAME) IN (" + quoted_tables.join(", ") + "))";
+        }
+
         // Always truncate before rebuilding
         snowflake.createStatement({
             sqlText: "TRUNCATE TABLE STAGE_TAA_DELTA_MANIFEST;"
@@ -41,6 +67,7 @@ AS '
         var list_command = "LIST @" + STAGE_NAME + " PATTERN=''.*ChangeData.*[.]csv''";
         snowflake.createStatement({sqlText: list_command}).execute();
 
+        // Optional WHERE clauses to restrict inserts to specified client(s) and/or table(s).
         var client_where_clause = is_client_scoped
             ? "AND parsed.client_id IN (" + client_id_in_list + ")"
             : "";
@@ -86,6 +113,10 @@ AS '
             WHERE parsed.tabledata_folder  = state.tabledata_folder
             -- Must be newer than the full load file (not before or equal to it)
               AND parsed.last_modified     > state.full_load_last_modified
+            -- Only include tables that are configured and active for delta load
+            INNER JOIN INGEST_TAA_TABLE_CONFIG cfg
+                ON  UPPER(cfg.SOURCE_TABLE_ID) = UPPER(parsed.table_id)
+                AND cfg.IS_ACTIVE_DELTA_LOAD   = TRUE
             -- Must not already have been applied
               AND NOT EXISTS (
                     SELECT 1
@@ -97,6 +128,7 @@ AS '
               AND parsed.table_id    IS NOT NULL
               AND parsed.tabledata_folder IS NOT NULL
               ` + client_where_clause + `
+              ` + table_where_clause + `
             ORDER BY parsed.last_modified ASC;
         `;
 
@@ -112,6 +144,9 @@ AS '
         var scope_msg = is_client_scoped
             ? " (filtered to client(s): " + client_filter_display + ")"
             : " (all clients)";
+        if (is_table_scoped) {
+            scope_msg += " (tables: " + table_filter_display + ")";
+        }
 
         return "Scanned " + total_files + " CSV stage file(s)" + scope_msg +
                "; inserted " + files_inserted + " unprocessed delta file(s) into STAGE_TAA_DELTA_MANIFEST.";

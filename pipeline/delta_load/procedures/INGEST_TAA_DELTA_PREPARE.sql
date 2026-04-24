@@ -22,6 +22,7 @@ AS '
 
         var stage_name_safe   = config["STAGE_NAME"]        || null;
         var client_filter     = config["CLIENT_ID_FILTER"]  || null;
+        var table_name_filter = config["TABLE_NAME_FILTER"] || null;
 
         if (!stage_name_safe) {
             // STAGE_NAME not yet configured -- silent skip so scheduled runs
@@ -37,9 +38,10 @@ AS '
         result_message += "Stage        : " + stage_name_safe + "\\n";
 
         result_message += "\\n=== BUILDING DELTA MANIFEST ===\\n";
-        var file_list_param = is_client_scoped ? "''" + client_filter + "''" : "NULL";
+        var file_list_param  = is_client_scoped  ? "''" + client_filter     + "''" : "NULL";
+        var table_list_param = table_name_filter ? "''" + table_name_filter + "''" : "NULL";
         var manifest_sql = "CALL BUILD_STAGE_TAA_DELTA_MANIFEST(" +
-                           file_list_param + ", ''" + stage_name_safe + "'');";
+                           file_list_param + ", " + table_list_param + ", ''" + stage_name_safe + "'');";
         var manifest_result = snowflake.createStatement({sqlText: manifest_sql}).execute();
         manifest_result.next();
         result_message += "  " + manifest_result.getColumnValue(1) + "\\n";

@@ -33,7 +33,7 @@ VALUES
         'FULL_LOAD_TIMEOFFREQUESTDETAIL()', 'DELTA_LOAD_TIMEOFFREQUESTDETAIL()',
         'f9e8cf07-8d4f-1c51-df47-da7de058a176',
         80, TRUE, TRUE, TRUE,
-        'Time off request detail lines per client');
+        'Time off request detail lines per client'),
 
     ('ENTERPRISECUSTOMER',
         'FULL_LOAD_ENTERPRISECUSTOMER()',    'DELTA_LOAD_ENTERPRISECUSTOMER()',

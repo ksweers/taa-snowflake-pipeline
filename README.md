@@ -36,7 +36,7 @@ Snowflake (this pipeline)
 | | Full load | Delta load |
 |---|---|---|
 | **Source format** | Parquet | CSV (change-data capture) |
-| **Trigger** | Snowflake Task DAG (`TAA_FL_ROOT`) | Snowflake Task DAG (`TAA_DL_ROOT`) |
+| **Trigger** | Snowflake Task DAG (`TAA_FULL_ROOT`) | Snowflake Task DAG (`TAA_DELTA_ROOT`) |
 | **Orchestration** | `INGEST_TAA_LAUNCH_FULL_LOAD` → `INGEST_TAA_FULL_LOAD_PREPARE` → wave tasks → `INGEST_TAA_FULL_LOAD_FINALIZE` | `INGEST_TAA_LAUNCH_DELTA_LOAD` → `INGEST_TAA_DELTA_PREPARE` → wave tasks → `INGEST_TAA_DELTA_FINALIZE` |
 | **Per-table procedure** | `FULL_LOAD_<TABLE>` — COPY INTO target | `DELTA_LOAD_<TABLE>` — COPY INTO staging → MERGE |
 | **Deduplication** | Manifest skips already-audited files | QUALIFY on LSN DESC before MERGE |

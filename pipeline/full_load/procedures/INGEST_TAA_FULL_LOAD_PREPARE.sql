@@ -53,14 +53,34 @@ AS '
             }
         }
 
+
         result_message += "=== INGEST_TAA_FULL_LOAD_PREPARE ===\\n";
         result_message += "Client scope : " + (is_client_scoped ? client_filter : "ALL CLIENTS") + "\\n";
         result_message += "Stage        : " + stage_name_safe + "\\n";
 
+        // ------------------------------------------------------------------
+        // Build the file manifest FIRST so we know exactly which
+        // client/table combinations have files before touching target tables.
+        // ------------------------------------------------------------------
+        result_message += "\\n=== BUILDING FILE MANIFEST ===\\n";
+        var file_list_param  = is_client_scoped  ? "''" + client_filter     + "''" : "NULL";
+        var table_list_param = table_name_filter ? "''" + table_name_filter + "''" : "NULL";
+        var manifest_sql = "CALL BUILD_STAGE_TAA_FULL_FILE_MANIFEST(" +
+                           file_list_param + ", " + table_list_param + ", ''" + stage_name_safe + "'');";
+        var manifest_result = snowflake.createStatement({sqlText: manifest_sql}).execute();
+        manifest_result.next();
+        result_message += "  " + manifest_result.getColumnValue(1) + "\\n";
+
+        // ------------------------------------------------------------------
+        // Clear target tables -- but ONLY for client/table combinations that
+        // actually have files in the manifest just built.  This prevents data
+        // loss when a client-scoped run finds no new files for a given table
+        // (e.g. all files were already loaded per the audit log).
+        // ------------------------------------------------------------------
         result_message += "\\n=== CLEARING TARGET TABLES ===\\n";
 
         var ctrl = snowflake.createStatement({sqlText: `
-            SELECT TABLE_NAME, IS_MULTI_TENANT
+            SELECT TABLE_NAME, IS_MULTI_TENANT, SOURCE_TABLE_ID
             FROM INGEST_TAA_TABLE_CONFIG
             WHERE IS_ACTIVE_FULL_LOAD = TRUE
             ORDER BY LOAD_ORDER, TABLE_NAME
@@ -69,12 +89,35 @@ AS '
         while (ctrl.next()) {
             var tbl_name        = ctrl.getColumnValue(1);
             var is_multi_tenant = ctrl.getColumnValue(2);
+            var source_table_id = ctrl.getColumnValue(3);
 
             if (table_filter_map !== null &&
                 !table_filter_map[tbl_name.toUpperCase()]) { continue; }
 
             if (is_client_scoped && !is_multi_tenant) {
                 result_message += "  SKIPPED (not multi-tenant): " + tbl_name + "\\n";
+                continue;
+            }
+
+            // Check whether the manifest has any files for this table
+            // (and for the specific clients in scope, if client-scoped).
+            var manifest_check_sql;
+            if (is_client_scoped) {
+                manifest_check_sql =
+                    "SELECT COUNT(*) FROM STAGE_TAA_FULL_FILE_MANIFEST " +
+                    "WHERE UPPER(table_id) = UPPER(''" + source_table_id + "'') " +
+                    "AND client_id IN (" + client_id_in_list + ")";
+            } else {
+                manifest_check_sql =
+                    "SELECT COUNT(*) FROM STAGE_TAA_FULL_FILE_MANIFEST " +
+                    "WHERE UPPER(table_id) = UPPER(''" + source_table_id + "'')";
+            }
+            var check_result = snowflake.createStatement({sqlText: manifest_check_sql}).execute();
+            check_result.next();
+            var manifest_rows = check_result.getColumnValue(1);
+
+            if (manifest_rows === 0) {
+                result_message += "  SKIPPED (no files in manifest): " + tbl_name + "\\n";
                 continue;
             }
 
@@ -89,13 +132,6 @@ AS '
             result_message += "  Cleared: " + tbl_name + "\\n";
         }
 
-        result_message += "\\n=== BUILDING FILE MANIFEST ===\\n";
-        var file_list_param = is_client_scoped ? "''" + client_filter + "''" : "NULL";
-        var manifest_sql = "CALL BUILD_STAGE_TAA_FULL_FILE_MANIFEST(" +
-                           file_list_param + ", ''" + stage_name_safe + "'');";
-        var manifest_result = snowflake.createStatement({sqlText: manifest_sql}).execute();
-        manifest_result.next();
-        result_message += "  " + manifest_result.getColumnValue(1) + "\\n";
         result_message += "\\nPREPARE COMPLETE -- Wave 1 tasks will now start.\\n";
 
         return result_message;

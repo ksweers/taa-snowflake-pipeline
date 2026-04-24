@@ -111,6 +111,14 @@ AS '
         msg += "  Finalize time   : " + duration_sec + " seconds\\n";
         msg += "\\nDELTA LOAD DAG RUN COMPLETE";
 
+        // Reset filter parameters now that the run is fully complete so the
+        // next nightly scheduled run always starts clean.
+        snowflake.createStatement({sqlText:
+            "UPDATE INGEST_TAA_DELTA_RUN_CONFIG " +
+            "SET PARAM_VALUE = NULL, UPDATED_AT = CURRENT_TIMESTAMP() " +
+            "WHERE PARAM_NAME IN (''CLIENT_ID_FILTER'', ''TABLE_NAME_FILTER'')"
+        }).execute();
+
         return msg;
     } catch (err) {
         throw new Error("INGEST_TAA_DELTA_FINALIZE failed: " + err.message);
