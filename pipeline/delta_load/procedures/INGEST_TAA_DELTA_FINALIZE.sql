@@ -48,7 +48,6 @@ AS '
         if (manifest_files === 0) {
             msg += "\\n  No new delta files found -- all tables are up to date.\\n";
             msg += "\\nDELTA LOAD DAG RUN COMPLETE (no-op)";
-            return msg;
         }
 
         // ------------------------------------------------------------------
