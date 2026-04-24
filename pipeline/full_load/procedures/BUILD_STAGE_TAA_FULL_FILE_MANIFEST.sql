@@ -2,8 +2,9 @@ USE DATABASE &{{SNOWFLAKE_DATABASE}};
 USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
 CREATE OR REPLACE PROCEDURE BUILD_STAGE_TAA_FULL_FILE_MANIFEST(
-    CLIENT_ID_FILTER VARCHAR,
-    STAGE_NAME       VARCHAR
+    CLIENT_ID_FILTER    VARCHAR,
+    TABLE_NAME_FILTER   VARCHAR,
+    STAGE_NAME          VARCHAR
 )
 RETURNS VARCHAR
 LANGUAGE JAVASCRIPT
@@ -33,6 +34,31 @@ AS '
             client_id_in_list = quoted_ids.join(", ");
         }
 
+        // Parse comma-separated table names into a subquery against INGEST_TAA_TABLE_CONFIG.
+        // The manifest stores table_id (UUID); we resolve names → UUIDs via the config table.
+        var is_table_scoped = (
+            TABLE_NAME_FILTER !== null &&
+            TABLE_NAME_FILTER !== undefined &&
+            TABLE_NAME_FILTER.trim() !== ""
+        );
+        var table_where_clause = "";
+        var table_filter_display = null;
+        if (is_table_scoped) {
+            var tbl_names = TABLE_NAME_FILTER.trim().split(",");
+            var quoted_tables = [];
+            table_filter_display = "";
+            for (var ti = 0; ti < tbl_names.length; ti++) {
+                var tn = tbl_names[ti].trim().toUpperCase();
+                if (tn.length > 0) {
+                    quoted_tables.push("''" + tn + "''");
+                    table_filter_display += (table_filter_display.length > 0 ? ", " : "") + tn;
+                }
+            }
+            table_where_clause = "AND p.table_id IN (" +
+                "SELECT SOURCE_TABLE_ID FROM INGEST_TAA_TABLE_CONFIG " +
+                "WHERE UPPER(TABLE_NAME) IN (" + quoted_tables.join(", ") + "))";
+        }
+
         // Always TRUNCATE the manifest before rebuilding it.
         // This guarantees the individual load procedures only see files for the
         // current runs clients. Scope is then controlled by the WHERE clause on
@@ -47,8 +73,7 @@ AS '
         var list_command = "LIST @" + STAGE_NAME + " PATTERN=''.*FullCopyData.*[.]parquet''";
         snowflake.createStatement({sqlText: list_command}).execute();
 
-        // Optional additional WHERE clause to restrict inserts to the specified client(s)
-        // Use table alias p.client_id to avoid ambiguity with the latest_folder CTE join.
+        // Optional WHERE clauses to restrict inserts to specified client(s) and/or table(s).
         var client_where_clause = is_client_scoped
             ? "AND p.client_id IN (" + client_id_in_list + ")"
             : "";
@@ -96,6 +121,10 @@ AS '
                 ON  lf.client_id               = p.client_id
                 AND lf.table_id                = p.table_id
                 AND lf.latest_tabledata_folder = p.tabledata_folder
+            -- Only include tables that are configured and active for full load
+            INNER JOIN INGEST_TAA_TABLE_CONFIG cfg
+                ON  UPPER(cfg.SOURCE_TABLE_ID) = UPPER(p.table_id)
+                AND cfg.IS_ACTIVE_FULL_LOAD    = TRUE
             WHERE p.client_id IS NOT NULL
               AND p.table_id  IS NOT NULL
               -- Skip files already successfully loaded in a prior run
@@ -106,6 +135,7 @@ AS '
                       AND aud.load_status     = ''SUCCESS''
               )
               ` + client_where_clause + `
+              ` + table_where_clause + `
             ORDER BY p.client_id, p.table_id, p.filename;
         `;
 
@@ -125,6 +155,9 @@ AS '
         var scope_msg = is_client_scoped
             ? " (filtered to client(s): " + client_filter_display + ")"
             : " (all clients)";
+        if (is_table_scoped) {
+            scope_msg += " (tables: " + table_filter_display + ")";
+        }
 
         var skipped_msg = already_loaded > 0
             ? "; " + already_loaded + " file(s) skipped (already loaded per audit)"
