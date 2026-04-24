@@ -58,7 +58,7 @@ AS '
 -- =============================================================================
 -- PROCEDURE: INGEST_TAA_DELTA_FINALIZE
 -- =============================================================================
--- No-argument payload for TAA_DL_FINALIZE.
+-- No-argument payload for TAA_DELTA_FINALIZE.
 -- Runs after all leaf tasks complete. Currently returns a summary; extend
 -- here for any post-load state updates or notifications.
 -- =============================================================================

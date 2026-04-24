@@ -145,7 +145,7 @@ AS '
 -- =============================================================================
 -- PROCEDURE: INGEST_TAA_FULL_LOAD_FINALIZE
 -- =============================================================================
--- No-argument payload for TAA_FL_FINALIZE.
+-- No-argument payload for TAA_FULL_FINALIZE.
 -- Updates INGEST_TAA_FULL_LOAD_STATE from STAGE_TAA_FULL_FILE_MANIFEST so the
 -- delta pipeline knows the correct TableData_* folder and cutoff timestamps.
 -- =============================================================================

@@ -136,6 +136,6 @@ AS '
 -- 1. Validates STAGE_NAME.
 -- 2. Writes all three run parameters into INGEST_TAA_DELTA_RUN_CONFIG.
 --    STAGE_NAME persists -- subsequent scheduled runs use the stored value.
--- 3. Triggers the Task DAG via EXECUTE TASK TAA_DL_ROOT.
+-- 3. Triggers the Task DAG via EXECUTE TASK TAA_DELTA_ROOT.
 -- 4. Returns immediately (non-blocking). Use TASK_HISTORY to monitor.
 -- =============================================================================

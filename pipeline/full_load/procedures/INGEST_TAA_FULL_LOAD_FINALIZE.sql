@@ -135,7 +135,7 @@ AS '
         // ------------------------------------------------------------------
         // Suspend root task
         // ------------------------------------------------------------------
-        snowflake.createStatement({sqlText: "ALTER TASK TAA_FL_ROOT SUSPEND;"}).execute();
+        snowflake.createStatement({sqlText: "ALTER TASK TAA_FULL_ROOT SUSPEND;"}).execute();
 
         var end_time     = new Date();
         var duration_sec = ((end_time - run_start) / 1000).toFixed(2);
@@ -148,7 +148,7 @@ AS '
             msg += "  Failed files  : " + total_failed + " -- check INGEST_TAA_FILE_AUDIT\\n";
         }
         msg += "  Finalize time : " + duration_sec + " seconds\\n";
-        msg += "  TAA_FL_ROOT   : SUSPENDED\\n";
+        msg += "  TAA_FULL_ROOT   : SUSPENDED\\n";
         msg += "\\nFULL LOAD DAG RUN COMPLETE";
 
         // Reset filter parameters now that the run is fully complete so the
@@ -173,6 +173,6 @@ AS '
 --
 -- 1. Validates STAGE_NAME.
 -- 2. Writes all three run parameters into INGEST_TAA_RUN_CONFIG.
--- 3. Triggers the Task DAG via EXECUTE TASK TAA_FL_ROOT.
+-- 3. Triggers the Task DAG via EXECUTE TASK TAA_FULL_ROOT.
 -- 4. Returns immediately (non-blocking). Use TASK_HISTORY to monitor.
 -- =============================================================================
