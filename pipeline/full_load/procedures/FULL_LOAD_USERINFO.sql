@@ -69,15 +69,29 @@ AS '
                     USERID,
                     EMPIDENTIFIER,
                     MODIFIEDON,
-                    STARTDATE
+                    STARTDATE,
+                    CLIENTID,
+                    PAYROLLEMPLOYEEID,
+                    WEID,
+                    PEID,
+                    PNGSSOUSERGUID,
+                    ISSHAREDWORKER,
+                    PNGUSERNAME
                 )
                 FROM (
                     SELECT
                         REGEXP_SUBSTR(METADATA$FILENAME::STRING, ''/([^/]+)/Tables/'', 1, 1, ''e''),
                         $1:UserID::NUMBER(38,0),
-                        $1:EmpIdentifier::TEXT,
+                        $1:EmpIdentifier::VARCHAR(50),
                         $1:ModifiedOn::TIMESTAMP_NTZ,
-                        $1:StartDate::TIMESTAMP_NTZ
+                        $1:StartDate::TIMESTAMP_NTZ,
+                        $1:ClientID::VARCHAR(50),
+                        $1:PayrollEmployeeID::NUMBER(38,0),
+                        $1:WEID::VARCHAR(20),
+                        $1:PEID::VARCHAR(20),
+                        $1:PNGSSOUserGUID::VARCHAR(20),
+                        $1:IsSharedWorker::BOOLEAN,
+                        $1:PngUserName::VARCHAR(25)
                     FROM @` + STAGE_NAME + `
                     (FILE_FORMAT => ''FF_TAA_ONELAKE_PARQUET'')
                 )

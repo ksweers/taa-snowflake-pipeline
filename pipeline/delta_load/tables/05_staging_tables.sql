@@ -1,6 +1,70 @@
 USE DATABASE &{{SNOWFLAKE_DATABASE}};
 USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
+-- =============================================================================
+-- NEW STAGING TABLES: USERINFOPAYROLLMAPPING, LLDETAIL, USERINFOEMPSTATUS
+-- =============================================================================
+
+CREATE OR REPLACE TABLE STG_DELTA_USERINFOPAYROLLMAPPING (
+    CHANGE_TYPE              NUMBER(38,0),
+    LSN                      NUMBER(38,0),
+    DATABASEPHYSICALNAME     VARCHAR(16777216),
+    USERINFOPAYROLLMAPPINGID NUMBER(38,0),
+    USERID                   NUMBER(38,0),
+    PAYROLLCLIENTID          VARCHAR(36),
+    PAYROLLEMPLOYEEID        NUMBER(38,0),
+    STARTDATETIME            TIMESTAMP_NTZ(9),
+    ENDDATETIME              TIMESTAMP_NTZ(9),
+    MODIFIEDBY               NUMBER(38,0),
+    MODIFIEDON               TIMESTAMP_NTZ(9),
+    EMPLOYEESTATUS           NUMBER(38,0),
+    WEID                     VARCHAR(100),
+    WORKERVERSION            NUMBER(38,0)
+);
+
+
+CREATE OR REPLACE TABLE STG_DELTA_LLDETAIL (
+    CHANGE_TYPE          NUMBER(38,0),
+    LSN                  NUMBER(38,0),
+    DATABASEPHYSICALNAME VARCHAR(16777216),
+    LLDETAILID           NUMBER(38,0),
+    LLID                 NUMBER(38,0),
+    LLDETAILCODE         VARCHAR(300),
+    LLDETAILNAME         VARCHAR(300),
+    STARTDATE            TIMESTAMP_NTZ(9),
+    ENDDATE              TIMESTAMP_NTZ(9),
+    MODIFIEDBY           NUMBER(38,0),
+    MODIFIEDON           TIMESTAMP_NTZ(9),
+    ISDELETED            BOOLEAN,
+    EMPNOTESREQUIRED     BOOLEAN,
+    CREATEDON            TIMESTAMP_NTZ(9),
+    CREATEDBY            NUMBER(38,0),
+    PAYROLLUNIQUEID      NUMBER(38,0),
+    ORIGINALCODE         VARCHAR(300),
+    CASTARTDATE          TIMESTAMP_NTZ(9),
+    CAENDDATE            TIMESTAMP_NTZ(9),
+    PAYROLLCLIENTID      VARCHAR(36),
+    COLORCODE            VARCHAR(7)
+);
+
+
+CREATE OR REPLACE TABLE STG_DELTA_USERINFOEMPSTATUS (
+    CHANGE_TYPE                  NUMBER(38,0),
+    LSN                          NUMBER(38,0),
+    DATABASEPHYSICALNAME         VARCHAR(16777216),
+    USERINFOEMPSTATUSID          NUMBER(38,0),
+    USERID                       NUMBER(38,0),
+    EMPSTATUS                    NUMBER(38,0),
+    STARTDATETIME                TIMESTAMP_NTZ(9),
+    ENDDATETIME                  TIMESTAMP_NTZ(9),
+    MODIFIEDBY                   NUMBER(38,0),
+    MODIFIEDON                   TIMESTAMP_NTZ(9),
+    DESCRIPTION                  VARCHAR(16777216),
+    RETURNTOWORKDATE             TIMESTAMP_NTZ(9),
+    INACTIVEEMPDATAPROCESSDATE   TIMESTAMP_NTZ(9)
+);
+
+
 CREATE OR REPLACE TABLE STG_DELTA_USERINFOISSALARY (
     CHANGE_TYPE         NUMBER(38,0),
     LSN                 NUMBER(38,0),
@@ -407,10 +471,17 @@ CREATE OR REPLACE TABLE STG_DELTA_USERINFO (
     CHANGE_TYPE          NUMBER,
     LSN                  NUMBER(38,0),
     DATABASEPHYSICALNAME VARCHAR,
-    USERID               NUMBER,
+    USERID               NUMBER(38,0),
     EMPIDENTIFIER        VARCHAR(50),
-    MODIFIEDON           TIMESTAMP_NTZ,
-    STARTDATE            TIMESTAMP_NTZ
+    MODIFIEDON           TIMESTAMP_NTZ(9),
+    STARTDATE            TIMESTAMP_NTZ(9),
+    CLIENTID             VARCHAR(50),
+    PAYROLLEMPLOYEEID    NUMBER(38,0),
+    WEID                 VARCHAR(20),
+    PEID                 VARCHAR(20),
+    PNGSSOUSERGUID       VARCHAR(20),
+    ISSHAREDWORKER       BOOLEAN,
+    PNGUSERNAME          VARCHAR(25)
 );
 
 -- =============================================================================

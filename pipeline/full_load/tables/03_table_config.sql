@@ -87,6 +87,24 @@ VALUES
         'FULL_LOAD_TIMESLICEPOSTSHIFTDIFFDETAIL()', 'DELTA_LOAD_TIMESLICEPOSTSHIFTDIFFDETAIL()',
         'bb67bf1f-a87a-1912-57fd-686aee5c7361',
         120, TRUE, TRUE, TRUE,
-        'Time slice shift differential detail records per client');
+        'Time slice shift differential detail records per client'),
+
+    ('USERINFOPAYROLLMAPPING',
+        'FULL_LOAD_USERINFOPAYROLLMAPPING()',     'DELTA_LOAD_USERINFOPAYROLLMAPPING()',
+        'f1b0a3f6-49a5-a942-2349-e2c4c7fb15fa',
+        25, TRUE, TRUE, TRUE,
+        'Employee payroll system mapping records per client'),
+
+    ('LLDETAIL',
+        'FULL_LOAD_LLDETAIL()',                  'DELTA_LOAD_LLDETAIL()',
+        '46c059a2-1b66-97a0-6dbc-4b1bf1ca4219',
+        35, TRUE, TRUE, TRUE,
+        'Labor level detail code definitions per client'),
+
+    ('USERINFOEMPSTATUS',
+        'FULL_LOAD_USERINFOEMPSTATUS()',         'DELTA_LOAD_USERINFOEMPSTATUS()',
+        'e1b6510c-9ad1-ba04-1c43-1c8345dc44b1',
+        55, TRUE, TRUE, TRUE,
+        'Employee status history records per client');
 
 --

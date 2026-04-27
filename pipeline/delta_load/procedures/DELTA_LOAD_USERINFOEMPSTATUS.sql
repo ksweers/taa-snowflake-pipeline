@@ -1,7 +1,24 @@
 USE DATABASE &{{SNOWFLAKE_DATABASE}};
 USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
-CREATE OR REPLACE PROCEDURE DELTA_LOAD_USERINFO(
+-- =============================================================================
+-- DELTA_LOAD_USERINFOEMPSTATUS
+-- PK: DATABASEPHYSICALNAME + USERINFOEMPSTATUSID
+-- DATABASEPHYSICALNAME derived from path via REGEXP_SUBSTR on METADATA$FILENAME
+-- CDC CSV positional mapping ($1=LSN hex, $2=skipped, $3=CHANGE_TYPE, $4=skipped):
+--   $5  = UserInfoEmpStatusID          (NUMBER)
+--   $6  = UserId                        (NUMBER)
+--   $7  = EmpStatus                     (NUMBER)
+--   $8  = StartDateTime                 (TIMESTAMP_NTZ)
+--   $9  = EndDateTime                   (TIMESTAMP_NTZ)
+--   $10 = ModifiedBy                    (NUMBER)
+--   $11 = ModifiedOn                    (TIMESTAMP_NTZ)
+--   $12 = Description                   (TEXT)
+--   $13 = ReturnToWorkDate              (TIMESTAMP_NTZ)
+--   $14 = InActiveEmpDataProcessDate    (TIMESTAMP_NTZ)
+-- =============================================================================
+
+CREATE OR REPLACE PROCEDURE DELTA_LOAD_USERINFOEMPSTATUS(
     STAGE_NAME VARCHAR
 )
 RETURNS VARCHAR
@@ -21,7 +38,7 @@ AS '
                 SUBSTRING(full_file_path, POSITION(''/LandingZone/'' IN full_file_path)) AS relative_path,
                 client_id, table_id, filename, full_file_path, last_modified
             FROM STAGE_TAA_DELTA_MANIFEST
-            WHERE table_id = ''c930ce7d-904e-31a5-156d-559bc63e4246''
+            WHERE table_id = ''e1b6510c-9ad1-ba04-1c43-1c8345dc44b1''
             ORDER BY last_modified ASC
         `;
         var file_results  = snowflake.createStatement({sqlText: get_files_query}).execute();
@@ -43,17 +60,12 @@ AS '
                 full_file_path: full_file_path
             };
         }
-        if (file_list.length === 0) { return "No delta files found for USERINFO."; }
+        if (file_list.length === 0) { return "No delta files found for USERINFOEMPSTATUS."; }
 
         // Step 2: TRUNCATE staging once before all batches.
-        snowflake.createStatement({sqlText: "TRUNCATE TABLE STG_DELTA_USERINFO;"}).execute();
+        snowflake.createStatement({sqlText: "TRUNCATE TABLE STG_DELTA_USERINFOEMPSTATUS;"}).execute();
 
         // Step 3: COPY all files into staging in batches of 1000.
-        //         Write per-file audit rows from each COPY result set.
-        //         Sparse CSV positional mapping (CDC cols $1-$4 are metadata):
-        //           $5=USERID, $6=EMPIDENTIFIER, $44=MODIFIEDON, $48=STARTDATE,
-        //           $68=CLIENTID, $70=PAYROLLEMPLOYEEID, $81=WEID, $82=PEID,
-        //           $83=PNGSSOUSERGUID, $86=ISSHAREDWORKER, $88=PNGUSERNAME
         var batch_size  = 1000;
         var batch_count = Math.ceil(file_list.length / batch_size);
 
@@ -63,11 +75,11 @@ AS '
             var files_clause = file_list.slice(start, end).join(", ");
 
             var copy_sql = `
-                COPY INTO STG_DELTA_USERINFO (
+                COPY INTO STG_DELTA_USERINFOEMPSTATUS (
                     CHANGE_TYPE, LSN, DATABASEPHYSICALNAME,
-                    USERID, EMPIDENTIFIER, MODIFIEDON, STARTDATE,
-                    CLIENTID, PAYROLLEMPLOYEEID, WEID, PEID,
-                    PNGSSOUSERGUID, ISSHAREDWORKER, PNGUSERNAME
+                    USERINFOEMPSTATUSID, USERID, EMPSTATUS,
+                    STARTDATETIME, ENDDATETIME, MODIFIEDBY, MODIFIEDON,
+                    DESCRIPTION, RETURNTOWORKDATE, INACTIVEEMPDATAPROCESSDATE
                 )
                 FROM (
                     SELECT
@@ -75,16 +87,15 @@ AS '
                         TO_NUMBER(SUBSTR($1::TEXT, 3), ''XXXXXXXXXXXXXXXXXXXXXXXX''),
                         REGEXP_SUBSTR(METADATA$FILENAME::STRING, ''/([^/]+)/Tables/'', 1, 1, ''e''),
                         $5::NUMBER(38,0),
-                        $6::VARCHAR(50),
-                        TRY_TO_TIMESTAMP_NTZ($44),
-                        TRY_TO_TIMESTAMP_NTZ($52),
-                        $68::VARCHAR(50),
-                        $70::NUMBER(38,0),
-                        $81::VARCHAR(20),
-                        $82::VARCHAR(20),
-                        $83::VARCHAR(20),
-                        $86::BOOLEAN,
-                        $88::VARCHAR(25)
+                        $6::NUMBER(38,0),
+                        $7::NUMBER(38,0),
+                        TRY_TO_TIMESTAMP_NTZ($8),
+                        TRY_TO_TIMESTAMP_NTZ($9),
+                        $10::NUMBER(38,0),
+                        TRY_TO_TIMESTAMP_NTZ($11),
+                        $12::TEXT,
+                        TRY_TO_TIMESTAMP_NTZ($13),
+                        TRY_TO_TIMESTAMP_NTZ($14)
                     FROM @` + STAGE_NAME + ` (FILE_FORMAT => ''FF_TAA_ONELAKE_CSV'')
                 )
                 FILES = (` + files_clause + `)
@@ -129,36 +140,35 @@ AS '
 
         // Step 4: ONE MERGE across all staged rows. LSN dedup guarantees last-value-wins.
         var merge_sql = `
-            MERGE INTO USERINFO tgt
+            MERGE INTO USERINFOEMPSTATUS tgt
             USING (
-                SELECT * FROM STG_DELTA_USERINFO WHERE CHANGE_TYPE IN (1,2,4)
+                SELECT * FROM STG_DELTA_USERINFOEMPSTATUS WHERE CHANGE_TYPE IN (1,2,4)
                 QUALIFY ROW_NUMBER() OVER (
-                    PARTITION BY DATABASEPHYSICALNAME, USERID
+                    PARTITION BY DATABASEPHYSICALNAME, USERINFOEMPSTATUSID
                     ORDER BY LSN DESC NULLS LAST
                 ) = 1
             ) src
-            ON  tgt.DATABASEPHYSICALNAME = src.DATABASEPHYSICALNAME
-            AND tgt.USERID               = src.USERID
+            ON  tgt.DATABASEPHYSICALNAME  = src.DATABASEPHYSICALNAME
+            AND tgt.USERINFOEMPSTATUSID   = src.USERINFOEMPSTATUSID
             WHEN MATCHED AND src.CHANGE_TYPE = 1 THEN DELETE
             WHEN MATCHED AND src.CHANGE_TYPE = 4 THEN UPDATE SET
-                tgt.EMPIDENTIFIER     = src.EMPIDENTIFIER,
-                tgt.MODIFIEDON        = src.MODIFIEDON,
-                tgt.STARTDATE         = src.STARTDATE,
-                tgt.CLIENTID          = src.CLIENTID,
-                tgt.PAYROLLEMPLOYEEID = src.PAYROLLEMPLOYEEID,
-                tgt.WEID              = src.WEID,
-                tgt.PEID              = src.PEID,
-                tgt.PNGSSOUSERGUID    = src.PNGSSOUSERGUID,
-                tgt.ISSHAREDWORKER    = src.ISSHAREDWORKER,
-                tgt.PNGUSERNAME       = src.PNGUSERNAME
+                tgt.USERID                      = src.USERID,
+                tgt.EMPSTATUS                   = src.EMPSTATUS,
+                tgt.STARTDATETIME               = src.STARTDATETIME,
+                tgt.ENDDATETIME                 = src.ENDDATETIME,
+                tgt.MODIFIEDBY                  = src.MODIFIEDBY,
+                tgt.MODIFIEDON                  = src.MODIFIEDON,
+                tgt.DESCRIPTION                 = src.DESCRIPTION,
+                tgt.RETURNTOWORKDATE            = src.RETURNTOWORKDATE,
+                tgt.INACTIVEEMPDATAPROCESSDATE  = src.INACTIVEEMPDATAPROCESSDATE
             WHEN NOT MATCHED AND src.CHANGE_TYPE IN (2,4) THEN INSERT (
-                DATABASEPHYSICALNAME, USERID, EMPIDENTIFIER, MODIFIEDON, STARTDATE,
-                CLIENTID, PAYROLLEMPLOYEEID, WEID, PEID, PNGSSOUSERGUID, ISSHAREDWORKER, PNGUSERNAME
+                DATABASEPHYSICALNAME, USERINFOEMPSTATUSID, USERID, EMPSTATUS,
+                STARTDATETIME, ENDDATETIME, MODIFIEDBY, MODIFIEDON,
+                DESCRIPTION, RETURNTOWORKDATE, INACTIVEEMPDATAPROCESSDATE
             ) VALUES (
-                src.DATABASEPHYSICALNAME, src.USERID, src.EMPIDENTIFIER,
-                src.MODIFIEDON, src.STARTDATE,
-                src.CLIENTID, src.PAYROLLEMPLOYEEID, src.WEID, src.PEID,
-                src.PNGSSOUSERGUID, src.ISSHAREDWORKER, src.PNGUSERNAME
+                src.DATABASEPHYSICALNAME, src.USERINFOEMPSTATUSID, src.USERID, src.EMPSTATUS,
+                src.STARTDATETIME, src.ENDDATETIME, src.MODIFIEDBY, src.MODIFIEDON,
+                src.DESCRIPTION, src.RETURNTOWORKDATE, src.INACTIVEEMPDATAPROCESSDATE
             )
         `;
         var merge_result = snowflake.createStatement({sqlText: merge_sql}).execute();
@@ -173,33 +183,8 @@ AS '
                "Inserts: " + total_inserts + ", Updates: " + total_updates +
                ", Deletes: " + total_deletes + ".";
     } catch (err) {
-        throw new Error("DELTA_LOAD_USERINFO failed: " + err.message);
+        throw new Error("DELTA_LOAD_USERINFOEMPSTATUS failed: " + err.message);
     }
 ';
 
-
--- =============================================================================
--- V3 ADDITIONS: Task DAG for parallel delta table loading
--- =============================================================================
--- The objects below add Task DAG support on top of the pipeline above.
--- All DELTA_LOAD_* procedures defined above are called by DELTA_LOAD_FROM_CONFIG.
 --
--- Task DAG structure (mirrors full load wave pattern):
---   TAA_DELTA_ROOT (nightly CRON 02:00 UTC; also triggered via INGEST_TAA_LAUNCH_DELTA_LOAD)
---     -> Wave 1 (8 parallel): CUSTOMER, ENTERPRISECUSTOMER, PAYTYPE, SCHEDULE,
---                             USERINFO, TIMEOFFDATA, TIMEOFFREQUEST, TIMESLICEPOST
---     -> Wave 2 (4 serial, each after its FK parent):
---          USERINFO -> USERINFOISSALARY
---          TIMEOFFREQUEST -> TIMEOFFREQUESTDETAIL
---          TIMESLICEPOST -> TIMESLICEPOSTEXCEPTIONDETAIL
---          TIMESLICEPOST -> TIMESLICEPOSTSHIFTDIFFDETAIL
---     -> TAA_DELTA_FINALIZE (after all 9 leaf tasks)
--- =============================================================================
-
-
--- =============================================================================
--- CONFIG TABLE
--- Stores the current run's parameters so Tasks can read them at runtime.
--- STAGE_NAME persists between runs -- set it once via INGEST_TAA_LAUNCH_DELTA_LOAD
--- and all subsequent scheduled runs will use the same value automatically.
--- =============================================================================
