@@ -97,7 +97,7 @@ AS '
                     SPLIT_PART(full_file_path, ''/'', -1)                                     AS filename
                 FROM file_list
             )
-            SELECT
+            SELECT distinct
                 parsed.full_file_path,
                 parsed.client_id,
                 parsed.table_id,

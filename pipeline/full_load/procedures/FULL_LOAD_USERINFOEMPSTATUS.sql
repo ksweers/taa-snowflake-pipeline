@@ -87,7 +87,7 @@ AS '
                     SELECT
                         REGEXP_SUBSTR(METADATA$FILENAME::STRING, ''/([^/]+)/Tables/'', 1, 1, ''e''),
                         $1:UserInfoEmpStatusID::NUMBER(38,0),
-                        $1:UserId::NUMBER(38,0),
+                        $1:UserID::NUMBER(38,0),
                         $1:EmpStatus::NUMBER(38,0),
                         $1:StartDateTime::TIMESTAMP_NTZ,
                         $1:EndDateTime::TIMESTAMP_NTZ,

@@ -114,7 +114,7 @@ AS '
             )
             -- Keep every file that lives inside that latest folder
             -- and has not already been successfully loaded (audit deduplication)
-            SELECT p.full_file_path, p.client_id, p.table_id,
+            SELECT distinct p.full_file_path, p.client_id, p.table_id,
                    p.tabledata_folder, p.filename, p.last_modified
             FROM parsed_files p
             INNER JOIN latest_folder lf
