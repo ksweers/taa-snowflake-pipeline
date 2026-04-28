@@ -3,7 +3,7 @@ USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
 CREATE OR REPLACE TASK TAA_DELTA_ROOT
     WAREHOUSE = &{{SNOWFLAKE_WAREHOUSE}}
-    SCHEDULE  = 'USING CRON 0 2 * * * UTC'
+    SCHEDULE  = 'USING CRON 0 2 * * * America/New_York'
     ALLOW_OVERLAPPING_EXECUTION = FALSE
     COMMENT = 'TAA delta load DAG root. Builds STAGE_TAA_DELTA_MANIFEST. Triggers all individual table tasks upon success. Fires nightly at 02:00 UTC; also triggered on-demand via INGEST_TAA_LAUNCH_DELTA_LOAD.'
 AS
