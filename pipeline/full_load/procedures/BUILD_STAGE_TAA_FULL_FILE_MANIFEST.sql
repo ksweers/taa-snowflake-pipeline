@@ -105,7 +105,7 @@ AS '
             parsed_files AS (
                 SELECT
                     full_file_path,
-                    SUBSTRING(full_file_path, POSITION(''LandingZone/'' IN full_file_path)) AS relative_path,
+                    ''/'' || SUBSTRING(full_file_path, POSITION(''LandingZone/'' IN full_file_path)) AS relative_path,
                     REGEXP_SUBSTR(full_file_path, ''/([^/]+)/Tables/'',    1, 1, ''e'', 1) AS client_id,
                     REGEXP_SUBSTR(full_file_path, ''/Tables/([^/]+)/'',    1, 1, ''e'', 1) AS table_id,
                     REGEXP_SUBSTR(full_file_path, ''/(TableData_[^/]+)/'', 1, 1, ''e'', 1) AS tabledata_folder,
