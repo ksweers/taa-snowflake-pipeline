@@ -2,9 +2,9 @@ USE DATABASE &{{SNOWFLAKE_DATABASE}};
 USE SCHEMA   &{{SNOWFLAKE_SCHEMA}};
 
 CREATE OR REPLACE PROCEDURE BUILD_STAGE_TAA_FULL_FILE_MANIFEST(
-    CLIENT_ID_FILTER    VARCHAR,
-    TABLE_NAME_FILTER   VARCHAR,
-    STAGE_NAME          VARCHAR
+    CLIENT_ID_FILTER  VARCHAR,
+    TABLE_NAME_FILTER VARCHAR,
+    STAGE_NAME        VARCHAR
 )
 RETURNS VARCHAR
 LANGUAGE JAVASCRIPT
@@ -67,11 +67,26 @@ AS '
             sqlText: "TRUNCATE TABLE STAGE_TAA_FULL_FILE_MANIFEST;"
         }).execute();
 
-        // LIST the full stage every run -- a client-scoped pattern cannot be used
-        // here because non-multi-tenant tables (CUSTOMER, ENTERPRISECUSTOMER) have
-        // files that are not nested under a client subfolder.
-        var list_command = "LIST @" + STAGE_NAME + " PATTERN=''.*FullCopyData.*[.]parquet''";
-        snowflake.createStatement({sqlText: list_command}).execute();
+        // Load the Parquet inventory from the static OneLake inventory file.
+        // The Fabric notebook overwrites this file in-place on every run.
+        var inv_file = "Inventory/file_inventory/Inventory_PARQUET.csv";
+
+        snowflake.createStatement({
+            sqlText: "CREATE OR REPLACE TEMPORARY TABLE STAGE_TAA_INV_RAW AS " +
+                     "SELECT " +
+                     "  REGEXP_SUBSTR($1, ''/LandingZone/.*'') AS full_file_path, " +
+                     "  TO_CHAR(TO_TIMESTAMP_NTZ($2, ''YYYY-MM-DD HH24:MI:SS''), " +
+                     "          ''DY, DD MON YYYY HH24:MI:SS'') || '' UTC'' AS last_modified " +
+                     "FROM @" + STAGE_NAME + "/" + inv_file + " (FILE_FORMAT => ''FF_TAA_INVENTORY_CSV'') " +
+                     "WHERE $1 LIKE ''%/FullCopyData/%''"
+        }).execute();
+
+        var cnt = snowflake.createStatement({sqlText: "SELECT COUNT(*) FROM STAGE_TAA_INV_RAW"}).execute();
+        cnt.next();
+        var total_files = cnt.getColumnValue(1);
+
+        var file_list_cte = "WITH file_list AS (SELECT full_file_path, last_modified FROM STAGE_TAA_INV_RAW),";
+
 
         // Optional WHERE clauses to restrict inserts to specified client(s) and/or table(s).
         var client_where_clause = is_client_scoped
@@ -81,16 +96,12 @@ AS '
         // Parse the listing and insert ALL files from the most-recent TableData_* folder
         // per client/table combination.
         // Large tables produce multiple data-N.parquet files in the same folder with the
-        // same timestamp -- the QUALIFY here picks the latest folder, then the outer join
+        // same timestamp -- MAX(tabledata_folder) picks the latest folder, then the join
         // keeps every file inside it.
         var insert_command = `
             INSERT INTO STAGE_TAA_FULL_FILE_MANIFEST
                 (FULL_FILE_PATH, CLIENT_ID, TABLE_ID, TABLEDATA_FOLDER, FILENAME, LAST_MODIFIED)
-            WITH file_list AS (
-                SELECT "name" AS full_file_path,
-                "last_modified" AS last_modified
-                FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
-            ),
+            ` + file_list_cte + `
             parsed_files AS (
                 SELECT
                     full_file_path,
@@ -114,7 +125,7 @@ AS '
             )
             -- Keep every file that lives inside that latest folder
             -- and has not already been successfully loaded (audit deduplication)
-            SELECT distinct p.full_file_path, p.client_id, p.table_id,
+            SELECT distinct p.relative_path, p.client_id, p.table_id,
                    p.tabledata_folder, p.filename, p.last_modified
             FROM parsed_files p
             INNER JOIN latest_folder lf
@@ -131,7 +142,7 @@ AS '
               AND NOT EXISTS (
                     SELECT 1
                     FROM INGEST_TAA_FILE_AUDIT aud
-                    WHERE aud.full_stage_path = p.full_file_path
+                    WHERE aud.full_stage_path = p.relative_path
                       AND aud.load_status     = ''SUCCESS''
               )
               ` + client_where_clause + `
@@ -143,13 +154,8 @@ AS '
         insert_result.next();
         var files_inserted = insert_result.getColumnValue(1);
 
-        // Total raw files seen by the LIST (before deduplication / client filtering / audit check)
-        var total_files_query = "SELECT COUNT(*) FROM TABLE(RESULT_SCAN(LAST_QUERY_ID(-2)))";
-        var total_result = snowflake.createStatement({sqlText: total_files_query}).execute();
-        total_result.next();
-        var total_files = total_result.getColumnValue(1);
-
         // Files excluded because they already appear in INGEST_TAA_FILE_AUDIT as SUCCESS
+        // (total_files was captured before the INSERT above)
         var already_loaded = total_files - files_inserted;
 
         var scope_msg = is_client_scoped
