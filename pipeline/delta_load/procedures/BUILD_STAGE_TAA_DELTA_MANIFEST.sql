@@ -63,16 +63,31 @@ AS '
             sqlText: "TRUNCATE TABLE STAGE_TAA_DELTA_MANIFEST;"
         }).execute();
 
-        // LIST the full stage -- ChangeData CSVs live within the same folder hierarchy
-        var list_command = "LIST @" + STAGE_NAME + " PATTERN=''.*ChangeData.*[.]csv''";
-        snowflake.createStatement({sqlText: list_command}).execute();
+        // Load the CSV inventory from the static OneLake inventory file.
+        // The Fabric notebook overwrites this file in-place on every run.
+        // Filter to ChangeData paths only (CSV delta feed files).
+        var inv_file = "Inventory/file_inventory/Inventory_CSV.csv";
+
+        snowflake.createStatement({
+            sqlText: "CREATE OR REPLACE TEMPORARY TABLE STAGE_TAA_CSV_INV_RAW AS " +
+                     "SELECT " +
+                     "  REGEXP_SUBSTR($1, ''/LandingZone/.*'') AS full_file_path, " +
+                     "  TO_CHAR(TO_TIMESTAMP_NTZ($2, ''YYYY-MM-DD HH24:MI:SS''), " +
+                     "          ''DY, DD MON YYYY HH24:MI:SS'') || '' UTC'' AS last_modified " +
+                     "FROM @" + STAGE_NAME + "/" + inv_file + " (FILE_FORMAT => ''FF_TAA_INVENTORY_CSV'') " +
+                     "WHERE $1 LIKE ''%/ChangeData/%''"
+        }).execute();
+
+        var cnt = snowflake.createStatement({sqlText: "SELECT COUNT(*) FROM STAGE_TAA_CSV_INV_RAW"}).execute();
+        cnt.next();
+        var total_files = cnt.getColumnValue(1);
 
         // Optional WHERE clauses to restrict inserts to specified client(s) and/or table(s).
         var client_where_clause = is_client_scoped
             ? "AND parsed.client_id IN (" + client_id_in_list + ")"
             : "";
 
-        // Parse listing results:
+        // Parse inventory results:
         //   Extract client_id: path segment before /Tables/
         //   Extract table_id:  path segment between /Tables/ and /TableData_/
         //   Extract tabledata_folder: the TableData_* segment
@@ -82,10 +97,7 @@ AS '
             INSERT INTO STAGE_TAA_DELTA_MANIFEST
                 (full_file_path, client_id, table_id, tabledata_folder, filename, last_modified)
             WITH file_list AS (
-                SELECT
-                    "name"          AS full_file_path,
-                    "last_modified" AS last_modified
-                FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+                SELECT full_file_path, last_modified FROM STAGE_TAA_CSV_INV_RAW
             ),
             parsed AS (
                 SELECT
@@ -136,10 +148,9 @@ AS '
         insert_result.next();
         var files_inserted = insert_result.getColumnValue(1);
 
-        var total_files_sql = "SELECT COUNT(*) FROM TABLE(RESULT_SCAN(LAST_QUERY_ID(-2)))";
-        var total_result = snowflake.createStatement({sqlText: total_files_sql}).execute();
-        total_result.next();
-        var total_files = total_result.getColumnValue(1);
+        // Files excluded because they already appear in INGEST_TAA_FILE_AUDIT as SUCCESS
+        // (total_files was captured before the INSERT above)
+        var already_loaded = total_files - files_inserted;
 
         var scope_msg = is_client_scoped
             ? " (filtered to client(s): " + client_filter_display + ")"
@@ -148,8 +159,9 @@ AS '
             scope_msg += " (tables: " + table_filter_display + ")";
         }
 
-        return "Scanned " + total_files + " CSV stage file(s)" + scope_msg +
-               "; inserted " + files_inserted + " unprocessed delta file(s) into STAGE_TAA_DELTA_MANIFEST.";
+        return "Processed " + total_files + " CSV inventory file(s)" + scope_msg +
+               "; inserted " + files_inserted + " unprocessed delta file(s) into STAGE_TAA_DELTA_MANIFEST" +
+               (already_loaded > 0 ? "; " + already_loaded + " file(s) skipped (already loaded per audit)" : "") + ".";
 
     } catch (err) {
         throw new Error("BUILD_STAGE_TAA_DELTA_MANIFEST failed: " + err.message);
